@@ -2,23 +2,33 @@
 name: factory-workflow
 description: |
   Commercial-grade development workflow for solopreneurs and small teams.
-  4-agent pipeline (PM → Schema → Dev → QA) with 14 quality gates,
-  file-authoritative state, and strict commit discipline.
-  L1 PM-facing gates (PRD / Analytics / Money Surface / Paywall Mental / Ship / T+7)
-  + L2 Dev-facing auto gates (Schema drift / Auth surface / Contract / Brand / Pricing / Pixel / CI).
-  Auto-detects project state, enforces gate artifacts, routes to gstack skills,
-  translates dev STOP reports into PM-readable format.
+  Two modes: fast (6 gates, 1 window, sub-agents) and full (14 gates, multi-window).
+  File-authoritative state, strict commit discipline, auto-detects project state,
+  enforces gate artifacts, routes to gstack skills.
 ---
 
 # factory-workflow — Commercial Dev Orchestration Skill
 
 ## Meta-Rules (read before anything else)
 
-1. **User is PM, not dev** — Does not read code, does not enter `backend/*.py` / `src/*.tsx`. Any STOP report must be translated into "what was done / PM impact / Gate evidence"
-2. **Files are authoritative** — Every decision / tool invocation / gate transition must be persisted to a file. Chat promises don't count
-3. **No artifact = BLOCKED** — Before closing any gate, must `ls -la <artifact_path>` to prove it exists. "Should be there" is not accepted
-4. **L1 user-driven / L2 fully automated** — L1 gates require PM to personally approve. L2 gates must be fully automated by agents
-5. **Smooth sailing = dereliction signal** — 3 consecutive STOP/ACK all-green triggers mandatory audit. Too smooth means gates are being bypassed
+1. **Files are authoritative** — Every decision / tool invocation / gate transition must be persisted to a file. Chat promises don't count
+2. **No artifact = BLOCKED** — Before closing any gate, must `ls -la <artifact_path>` to prove it exists. "Should be there" is not accepted
+3. **1 commit = 1 concern** — Feature / doc / migration / refactor each get their own commit. Every commit message includes non-goals
+4. **LOCKED = immutable** — PRD / BRAND changes go through Amendments, never in-place edits
+5. **Two modes exist** — `factory_mode: fast` (default) or `factory_mode: full`. Read from project CLAUDE.md. Rules below apply differently per mode
+
+### Fast vs Full Mode
+
+| | **Fast** (default) | **Full** |
+|---|---|---|
+| **When** | MVP, new projects, < 100 DAU | Paid users, > 100 DAU, money paths |
+| **Gates** | 6 essential | 14 full |
+| **Windows** | 1 main + sub-agents | 4 independent windows |
+| **Brief** | 4 sections (scope / non-goals / commits / progress) | 8 sections (full) |
+| **PM role** | PM-lite: can read git diff directly | PM-strict: STOP reports must be reformatted |
+| **Walkthrough** | Skip (PM is the builder) | Mandatory |
+| **AUDIT trigger** | Off | 3 consecutive all-green |
+| **Switch** | Set `factory_mode: full` in CLAUDE.md | Set `factory_mode: fast` in CLAUDE.md |
 
 ---
 
@@ -31,10 +41,20 @@ _PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$_CWD")
 _PROJECT_NAME=$(basename "$_PROJECT_ROOT")
 _BRANCH=$(git -C "$_PROJECT_ROOT" branch --show-current 2>/dev/null || echo "unknown")
 
-echo "=== Factory Workflow v1.0 — Project State ==="
+echo "=== Factory Workflow v1.1 — Project State ==="
 echo "PROJECT: $_PROJECT_NAME"
 echo "ROOT: $_PROJECT_ROOT"
 echo "BRANCH: $_BRANCH"
+
+# Detect factory_mode from CLAUDE.md
+_FACTORY_MODE="fast"
+if [ -f "$_PROJECT_ROOT/CLAUDE.md" ]; then
+  _MODE_LINE=$(grep -i 'factory_mode' "$_PROJECT_ROOT/CLAUDE.md" 2>/dev/null | head -1)
+  if echo "$_MODE_LINE" | grep -qi 'full'; then
+    _FACTORY_MODE="full"
+  fi
+fi
+echo "FACTORY_MODE: $_FACTORY_MODE"
 echo ""
 
 echo "=== Adoption check ==="
@@ -78,31 +98,60 @@ if [ -d "$_PROJECT_ROOT/docs/reviews" ]; then
 fi
 
 echo ""
-echo "=== Pending gate check (which gates have artifacts for latest version) ==="
+echo "=== Pending gate check (mode: $_FACTORY_MODE) ==="
 if [ -n "$_LATEST_PRD" ]; then
   _VER=$(basename "$_LATEST_PRD" .md | sed 's/PRD_//')
   echo "Checking for $_VER artifacts:"
-  for _G in office-hours-prd analytics-plan plan-eng-review auth-surface money-surface paywall-mental qa ship post-ship-t7; do
-    _ART="$_PROJECT_ROOT/docs/reviews/${_G}-${_VER}.md"
-    if [ -f "$_ART" ]; then
-      echo "  OK ${_G}-${_VER}.md"
+  if [ "$_FACTORY_MODE" = "fast" ]; then
+    # Fast mode: 6 essential gates only
+    for _G in plan-eng-review qa ship; do
+      _ART="$_PROJECT_ROOT/docs/reviews/${_G}-${_VER}.md"
+      if [ -f "$_ART" ]; then
+        echo "  OK ${_G}-${_VER}.md"
+      else
+        echo "  XX ${_G}-${_VER}.md"
+      fi
+    done
+    # PRD check (file existence, not review artifact)
+    if grep -q "LOCKED" "$_LATEST_PRD" 2>/dev/null; then
+      echo "  OK PRD LOCKED"
     else
-      echo "  XX ${_G}-${_VER}.md"
+      echo "  XX PRD not LOCKED"
     fi
-  done
+    # Dispatch brief check
+    if [ -n "$_LATEST_BRIEF" ]; then
+      echo "  OK dispatch brief exists"
+    else
+      echo "  XX no dispatch brief"
+    fi
+  else
+    # Full mode: all 14 gates
+    for _G in office-hours-prd analytics-plan plan-eng-review auth-surface money-surface paywall-mental qa ship post-ship-t7; do
+      _ART="$_PROJECT_ROOT/docs/reviews/${_G}-${_VER}.md"
+      if [ -f "$_ART" ]; then
+        echo "  OK ${_G}-${_VER}.md"
+      else
+        echo "  XX ${_G}-${_VER}.md"
+      fi
+    done
+  fi
 fi
 
 echo ""
-echo "=== Streak audit (3 consecutive green without gstack artifact = force audit) ==="
-if [ -d "$_PROJECT_ROOT/docs/reviews" ]; then
-  _24H_ARTIFACTS=$(find "$_PROJECT_ROOT/docs/reviews" -name "*.md" -mtime -1 2>/dev/null | wc -l | tr -d ' ')
-  echo "Artifacts written in last 24h: $_24H_ARTIFACTS"
-  if [ "$_24H_ARTIFACTS" = "0" ]; then
-    _LAST_COMMITS=$(git -C "$_PROJECT_ROOT" log --oneline -3 2>/dev/null | wc -l | tr -d ' ')
-    if [ "$_LAST_COMMITS" -ge "3" ]; then
-      echo "WARNING: AUDIT TRIGGER: 3+ commits recently, 0 gate artifacts in 24h — gstack may be underused"
+if [ "$_FACTORY_MODE" = "full" ]; then
+  echo "=== Streak audit (full mode only) ==="
+  if [ -d "$_PROJECT_ROOT/docs/reviews" ]; then
+    _24H_ARTIFACTS=$(find "$_PROJECT_ROOT/docs/reviews" -name "*.md" -mtime -1 2>/dev/null | wc -l | tr -d ' ')
+    echo "Artifacts written in last 24h: $_24H_ARTIFACTS"
+    if [ "$_24H_ARTIFACTS" = "0" ]; then
+      _LAST_COMMITS=$(git -C "$_PROJECT_ROOT" log --oneline -3 2>/dev/null | wc -l | tr -d ' ')
+      if [ "$_LAST_COMMITS" -ge "3" ]; then
+        echo "WARNING: AUDIT TRIGGER: 3+ commits recently, 0 gate artifacts in 24h — gstack may be underused"
+      fi
     fi
   fi
+else
+  echo "=== Streak audit: skipped (fast mode) ==="
 fi
 ```
 
@@ -118,10 +167,10 @@ Route to one of 6 modes based on preamble output:
 |---|---|---|
 | `ADOPTED: NO` | **BOOTSTRAP** | New project, create CLAUDE.md + docs/ structure first |
 | `ADOPTED: yes` + no pending ops | **RESUME** | Read git log + latest brief + latest artifact, report position + next step |
-| User is closing a gate | **GATE_TRANSITION** | Force ls artifact, verify exists before ACK |
-| User is opening a new sub-phase | **PHASE_OPEN** | Write dispatch brief + gstack relevance check |
+| User is closing a gate | **GATE_TRANSITION** | Force ls artifact (fast: 6 gates / full: 14 gates) |
+| User is opening a new sub-phase | **PHASE_OPEN** | Write dispatch brief (fast: 4 sections / full: 8 sections) |
 | STOP report mentions deviation / uncertainty | **VARIANCE** | Route to `/office-hours` or `/investigate` |
-| 3 consecutive green with no artifact | **AUDIT** | Force stop to check gstack underuse |
+| 3 consecutive green with no artifact | **AUDIT** | Force stop (full mode only, skipped in fast mode) |
 
 ---
 
@@ -279,27 +328,39 @@ Route to one of 6 modes based on preamble output:
 
 ---
 
-## Gate Table (14 gates)
+## Gate Table
+
+### Fast Mode Gates (6 essential)
+
+These gates are always enforced, regardless of mode:
+
+| Gate | Required Artifact | Skill |
+|---|---|---|
+| **Gate 1 PRD** | `docs/prd/PRD_v{ver}.md` LOCKED | (PM writes directly) |
+| **Gate 2 Schema** | `docs/openapi_v{ver}.yaml` + `docs/reviews/plan-eng-review-v{ver}.md` | `/plan-eng-review` |
+| **Gate 2.6 Phase open** | `docs/dispatch/agent2b-v{ver}.{phase}.md` | (orchestrator) |
+| **Gate 3 Smoke** | `docs/reviews/qa-v{ver}-rc.md` | `/qa` |
+| **Gate Ship** | `CHANGELOG.md` + annotated tag + `docs/reviews/ship-v{ver}.md` | `/ship` |
+| **Variance Gate** | `docs/prd/PRD_v{ver}_AMENDMENTS.md` | `/office-hours` or `/investigate` |
+
+### Full Mode Gates (14 — adds 8 more)
+
+These gates are ONLY enforced when `factory_mode: full`:
 
 | Gate | L1/L2 | Required Artifact | Skill |
 |---|---|---|---|
-| Gate 1 PRD | **L1** | `docs/prd/PRD_v{ver}.md` LOCKED + `docs/reviews/office-hours-prd-v{ver}.md` + `docs/reviews/prd-walkthrough-v{ver}.md` | `/office-hours` |
+| Gate 1 Walkthrough | **L1** | `docs/reviews/prd-walkthrough-v{ver}.md` | `/office-hours` |
 | Gate 1.5 Analytics | **L1** | `docs/reviews/analytics-plan-v{ver}.md` | `/office-hours` |
-| Gate 2 Schema | L2 | `docs/openapi_v{ver}.yaml` + clean drift + `docs/reviews/plan-eng-review-v{ver}.md` | `/plan-eng-review` |
 | Gate 2.1 Auth surface | L2 | `docs/reviews/auth-surface-v{ver}.md` (100% coverage) | (CI script) |
 | Gate 2.2 Contract test | L2 | `backend/tests/test_v{ver}_contract.py` + CI pass | (pytest) |
 | Gate 2.3 Pricing single source | L2 | `shared/pricing.json` + drift check pass | (CI script) |
 | Gate 2.4 Brand verify | L2 | `scripts/verify-brand.ts` pass | (CI script) |
 | Gate 2.5 Money Surface | **L1** | `docs/reviews/money-surface-v{ver}.md` (PM signed off) | `/office-hours` |
-| Gate 2.6 Phase open | L2 | `docs/dispatch/agent2b-v{ver}.{phase}.md` + §0 gstack check | (orchestrator) |
-| Gate 3 Pixel smoke | L2 | `dev_scripts/{phase}_smoke_*.py` + `docs/reviews/qa-v{ver}-rc.md` | `/qa` |
 | Gate Brand/UX | **L1** | `docs/brand/BRAND_v{ver}.md` LOCKED | `/design-consultation` |
 | Gate 3.5 Paywall Mental | **L1** | `docs/reviews/paywall-mental-v{ver}.md` (PM signed off) | `/office-hours` |
-| Gate Ship | **L1** | `CHANGELOG.md` + annotated tag + `docs/reviews/ship-v{ver}.md` | `/ship` |
 | Gate T+7 | **L1** | `docs/reviews/post-ship-t7-v{ver}.md` (metrics + retro) | `/retro` + `/office-hours` |
-| Variance Gate | **L1** | `docs/prd/PRD_v{ver}_AMENDMENTS.md` + source reference | `/office-hours` or `/investigate` |
 
-**Enforcement**: Before closing any gate, orchestrator must include `Gate evidence: ls -la <artifact_path>` in the ACK, with actual ls output. `<artifact missing>` or "should exist" → STATUS: BLOCKED.
+**Enforcement**: Before closing any gate, `ls -la <artifact_path>` to prove it exists. Missing = BLOCKED. In fast mode, only check the 6 essential gates. In full mode, check all 14.
 
 ### Gate 3 Cost-Aware Execution Order
 
