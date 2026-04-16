@@ -1,192 +1,131 @@
 # Factory Workflow
 
-A structured development methodology for [Claude Code](https://claude.ai/claude-code) that turns AI pair programming into a repeatable, gate-enforced pipeline.
+A [gstack](https://github.com/anthropics/claude-code) skill that turns Claude Code into a **gate-enforced development pipeline** for commercial-grade software.
 
-**The problem**: AI coding assistants are powerful but chaotic. Without structure, they skip steps, mix concerns in commits, drift from requirements, and produce work that's hard to resume across sessions.
+## What it does
 
-**The solution**: Factory Workflow enforces a 4-agent pipeline with 3 quality gates, file-authoritative state, and strict commit discipline. Every decision is tracked in files, every gate requires evidence artifacts, and any new session can resume from file state alone.
-
-## How it works
+4-agent pipeline with 14 quality gates. Files are authoritative, chat is ephemeral. Any new session can resume from file state alone.
 
 ```
-Agent 1 (PM)        →  Write PRD (requirements + non-goals + metrics)
-      ↓
-   [Gate 1]         →  PRD approved + LOCKED
-      ↓
-Agent 2A (Schema)   →  OpenAPI contract + DB migrations + drift check
-      ↓
-   [Gate 2]         →  Architecture review passes, 0 schema drift
-      ↓
-Agent 2B (Dev)      →  Implement code (per dispatch brief, one commit per task)
-      ↓
-   [Gate 3]         →  QA verification (contract tests + smoke tests)
-      ↓
-   Ship             →  Tag + CHANGELOG + release
+Agent 1 (PM)        →  PRD + commercial decisions
+     ↓
+  [Gate 1]          →  PRD approved + LOCKED
+     ↓
+Agent 2A (Schema)   →  OpenAPI + migrations + two-tier drift check
+     ↓
+  [Gate 2]          →  Architecture review, 0 schema drift
+     ↓
+Agent 2B (Dev)      →  Code per dispatch brief (1 commit = 1 task)
+     ↓
+  [Gate 3]          →  QA (contract tests + pixel smoke + VLM visual)
+     ��
+  Ship              →  Tag + CHANGELOG + deploy
 ```
 
-Each gate requires a **file artifact** to close. No artifact = gate blocked = can't proceed.
+Each gate requires a **file artifact** in `docs/reviews/` to close. No artifact = BLOCKED.
 
-## Quick start
+## Install
 
-### Option 1: Install to a project
+### Into a specific project
 
 ```bash
-git clone https://github.com/user/factory-workflow.git /tmp/factory-workflow
-cd /path/to/your-project
-/tmp/factory-workflow/install.sh .
+# Clone this repo
+git clone https://github.com/shiyiwang457-prog/factory-workflow.git /tmp/factory-workflow
+
+# Copy into your project's skill directory
+mkdir -p /path/to/your-project/.claude/skills/factory-workflow
+cp /tmp/factory-workflow/SKILL.md /path/to/your-project/.claude/skills/factory-workflow/
+cp -r /tmp/factory-workflow/templates /path/to/your-project/.claude/skills/factory-workflow/
 ```
 
-This copies slash commands, templates, and creates the docs/ structure.
-
-### Option 2: Install globally
+### Globally (available in all projects)
 
 ```bash
-git clone https://github.com/user/factory-workflow.git /tmp/factory-workflow
-/tmp/factory-workflow/install.sh --global
+git clone https://github.com/shiyiwang457-prog/factory-workflow.git ~/.claude/skills/factory-workflow
 ```
 
-Commands become available in all Claude Code sessions.
+### Verify
 
-### Option 3: Manual
+Open Claude Code and type `/factory-workflow` — it should auto-detect your project state and route to the correct mode.
 
-Copy `.claude/commands/factory-*.md` to your project's `.claude/commands/` directory.
+## Usage
 
-## Commands
+```
+/factory-workflow              # Auto-detect state → route to correct mode
+/factory-workflow new project  # Bootstrap a new project
+/factory-workflow resume       # Resume from file state in a new session
+/factory-workflow gate 2       # Check Gate 2 evidence
+```
 
-| Command | Phase | What it does |
+The skill auto-detects 6 modes:
+
+| Mode | Trigger | What happens |
 |---|---|---|
-| `/factory-init <name>` | Setup | Create project structure + CLAUDE.md |
-| `/factory-prd` | Agent 1 | Write and lock the PRD |
-| `/factory-schema` | Agent 2A | Design OpenAPI + migrations + drift check |
-| `/factory-dispatch <phase>` | Planning | Create dispatch brief for a dev phase |
-| `/factory-dev <phase>` | Agent 2B | Implement code per dispatch brief |
-| `/factory-qa` | Agent 3 | Independent QA verification |
-| `/factory-gate [gate]` | Audit | Check gate evidence artifacts |
-| `/factory-resume` | Recovery | Resume from file state in a new session |
-| `/factory-ship <version>` | Release | CHANGELOG + tag + ship review |
-| `/factory-status` | Info | PM-readable project status |
+| **BOOTSTRAP** | No CLAUDE.md | Creates project structure + CLAUDE.md |
+| **RESUME** | Existing project | Reads files, reports status, waits for confirmation |
+| **GATE_TRANSITION** | Closing a gate | Verifies artifact with `ls -la`, ACK or BLOCK |
+| **PHASE_OPEN** | Starting dev work | Creates dispatch brief + gstack relevance check |
+| **VARIANCE** | Deviation found | Routes to `/office-hours` or `/investigate` |
+| **AUDIT** | 3 consecutive all-green | Forces gstack usage check |
 
-## Core principles
+## 14 Gates
 
-### 1. Files are authoritative, chat is ephemeral
-Every decision, requirement, and progress record lives in a committed file. Chat messages are disposable. Any new Claude session can recover full context from files alone.
+| Gate | L1/L2 | What it checks |
+|---|---|---|
+| Gate 1 PRD | **L1** | PRD locked + walkthrough completed |
+| Gate 1.5 Analytics | **L1** | Success metrics declared |
+| Gate 2 Schema | L2 | OpenAPI aligned, 0 drift (two-tier check) |
+| Gate 2.1 Auth | L2 | 100% auth coverage on paid routes |
+| Gate 2.2 Contract | L2 | Contract tests pass |
+| Gate 2.3 Pricing | L2 | Single pricing source, no drift |
+| Gate 2.4 Brand | L2 | Brand guidelines verified |
+| Gate 2.5 Money Surface | **L1** | PM approves money-touching paths |
+| Gate 2.6 Phase Open | L2 | Dispatch brief committed + gstack check |
+| Gate 3 Pixel Smoke | L2 | Cost-aware 3-step QA funnel |
+| Gate Brand/UX | **L1** | Brand guidelines locked |
+| Gate 3.5 Paywall | **L1** | PM approves paywall UX |
+| Gate Ship | **L1** | PM approves release |
+| Gate T+7 | **L1** | Post-ship metrics + retrospective |
 
-### 2. Gates require evidence
-Each gate transition needs a file artifact to exist (`docs/reviews/*.md`). The system checks with `ls -la` — if the file isn't there, the gate is blocked.
+**L1** = PM must personally approve. **L2** = fully automated.
 
-### 3. One commit = one concern
-Features, docs, migrations, and refactors get separate commits. Every commit is independently revertable. Commit messages include non-goals (what was deliberately excluded).
+## gstack Integration
 
-### 4. LOCKED documents are immutable
-Once a PRD or brand guideline is LOCKED, it's never edited in place. Changes go through numbered Amendments or versioned copies.
+Factory Workflow routes to these gstack skills at specific trigger points:
 
-### 5. Schema-First
-Database migrations and API contracts are designed before implementation code. A two-tier drift check (field names + API paths) must pass before dev starts.
+| Skill | When |
+|---|---|
+| `/office-hours` | PRD decisions, money surface, paywall, strategy |
+| `/plan-eng-review` | Schema phase, brief creation/revision |
+| `/qa` | RC pre-ship, smoke tests |
+| `/ship` | Tag, release, deploy |
+| `/investigate` | Unknown root cause, external dependency issues |
+| `/retro` | Post-ship T+7, lesson extraction |
 
-## Project structure (after init)
+**Works without gstack too** — if a skill isn't available, the pipeline still runs with the rules embedded in SKILL.md. gstack just makes execution more standardized.
 
-```
-your-project/
-├── .claude/commands/        ← Slash commands
-│   ├── factory-init.md
-│   ├── factory-prd.md
-│   ├── factory-schema.md
-│   ├── factory-dispatch.md
-│   ├── factory-dev.md
-│   ├── factory-qa.md
-│   ├── factory-gate.md
-│   ├── factory-resume.md
-│   ├── factory-ship.md
-│   └── factory-status.md
-├── docs/
-│   ├── prd/                 ← PRD + amendments
-│   ├── brand/               ← Brand guidelines
-│   ├── dispatch/            ← Work orders for Agent 2B
-│   ├── reviews/             ← Gate evidence artifacts
-│   └── openapi_v*.yaml      ← API contract
-├── hooks/
-│   └── gate-check.sh        ← Optional: blocks edits without gate evidence
-├── templates/               ← Document templates
-├── CLAUDE.md                ← Project rules (auto-loaded every session)
-└── CHANGELOG.md
-```
+## Key Principles
 
-## The CLAUDE.md (most important file)
+1. **Files are authoritative** — Every decision persists in a committed file. Chat is disposable.
+2. **No artifact = BLOCKED** — Gates check with `ls -la`. Missing file = can't proceed.
+3. **1 commit = 1 concern** — Feature/doc/migration/refactor separated. Non-goals in every commit message.
+4. **LOCKED = immutable** — PRD changes go through numbered Amendments, never in-place edits.
+5. **Schema-First** — Two-tier drift check (field names + API paths) before any code.
+6. **Smooth = suspicious** — 3 all-green passes trigger mandatory audit.
+7. **PM reads no code** — STOP reports are translated to business language.
 
-The `CLAUDE.md` at your project root is loaded into **every** Claude Code conversation. It contains:
+## Templates Included
 
-- The 5 invariants (hard rules Claude must follow)
-- Gate evidence requirements
-- Commit discipline rules
-- Dispatch brief format (8 mandatory sections)
-- Resume ritual (how to recover in a new session)
-- Code execution rules (concurrency, negative assertions, inherited code)
+| Template | Purpose |
+|---|---|
+| `CLAUDE.md.template` | Project CLAUDE.md with all workflow rules |
+| `dispatch-brief.md.template` | 8-section dispatch brief for dev phases |
+| `gate-artifact.md.template` | Gate evidence document structure |
+| `stop-report.md.template` | PM-readable STOP report format |
 
-This is what makes "the same effect for everyone" possible — the rules are enforced by prompt, not by human memory.
+## Origin
 
-## Optional: Gate-check hook
-
-Enable the hook to block source file edits when gate evidence is missing:
-
-```json
-// .claude/settings.json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "command": "./hooks/gate-check.sh"
-    }]
-  }
-}
-```
-
-Set `FACTORY_GATE_MODE=advisory` for warnings instead of blocks.
-
-## Typical workflow
-
-```bash
-# 1. Initialize
-/factory-init my-saas-app
-
-# 2. Write requirements
-/factory-prd
-# → produces docs/prd/PRD_v1.0.md (LOCKED)
-
-# 3. Design schema
-/factory-schema
-# → produces docs/openapi_v1.0.yaml + architecture review
-
-# 4. Plan dev work
-/factory-dispatch v1.0.A
-# → produces docs/dispatch/agent2b-v1.0.A.md
-
-# 5. Implement
-/factory-dev v1.0.A
-# → code commits, one per task, brief §6 updated
-
-# 6. Verify
-/factory-qa
-# → produces docs/reviews/qa-v1.0-rc.md
-
-# 7. Ship
-/factory-ship v1.0.0
-# → CHANGELOG + tag + ship review
-
-# --- New session? ---
-/factory-resume
-# → reads all files, reports status, waits for confirmation
-```
-
-## Design philosophy
-
-This workflow was developed through real production use across multiple commercial projects. Every rule exists because its absence caused a specific, documented failure:
-
-- **Gate evidence** exists because gates were rubber-stamped when there was nothing to check
-- **Dispatch briefs as files** exist because chat-based instructions were lost when sessions ended
-- **Non-goals in commits** exist because scope creep was invisible without explicit exclusion
-- **Amendment numbering with grep** exists because stale references caused numbering collisions
-- **Two-tier drift check** exists because single-tier checks missed API-level mismatches
-
-The rules are strict by design. Loosening them recreates the problems they solved.
+Built through real production use across multiple commercial projects. Every rule exists because its absence caused a documented failure. The rules are strict by design — loosening them recreates the problems they solved.
 
 ## License
 

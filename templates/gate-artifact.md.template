@@ -1,0 +1,34 @@
+# {{GATE_NAME}} — {{PROJECT}} v{{VER}}
+
+**Gate**: {{GATE_ID}} ({{L1_OR_L2}})
+**Artifact**: {{THIS_FILE_PATH}}
+**Date**: {{DATE}}
+**Status**: DRAFT | SIGNED_OFF | SUPERSEDED
+**Signed off by**: {{PM_NAME | "Agent (L2 auto)"}}
+
+---
+
+## 1. What this gate verifies
+<!-- Plain-language explanation of what's being checked -->
+
+## 2. Evidence inputs
+<!-- What the decision/verification was based on — reference files / script output / STOP reports -->
+
+- Evidence 1: {{PATH_OR_QUOTE}}
+- Evidence 2: {{PATH_OR_QUOTE}}
+
+## 3. Decision / Result
+<!-- L1: PM's decision (Approved / Rejected / Deferred)
+     L2: CI / script pass/fail + numbers -->
+
+## 4. Follow-ups
+<!-- Things to do after gate closes -->
+
+- [ ] {{FOLLOWUP}}
+
+## 5. Cross-references
+<!-- Related PRD / Amendment / STOP report / previous gate artifact -->
+
+- PRD §{{SECTION}}
+- Previous gate: {{PATH}}
+- Amendment #{{N}}

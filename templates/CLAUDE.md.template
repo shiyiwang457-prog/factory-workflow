@@ -1,0 +1,86 @@
+---
+concurrency_tier: T0_MVP
+tier_upgrade_trigger: "DAU > 100 sustained for 2 weeks"
+---
+
+# {{PROJECT_NAME}} — Claude Code Project Context
+
+## Project Info
+- **Project**: {{PROJECT_NAME}}
+- **Type**: {{PROJECT_TYPE}}
+- **Current version**: {{CURRENT_VERSION}}
+- **Next version**: {{NEXT_VERSION}}
+- **Concurrency tier**: T0_MVP (see factory-workflow SKILL.md §Concurrency Tier)
+- **Upgrade trigger**: DAU > 100 sustained 2 weeks → Variance Gate to upgrade to T1_BETA
+
+## User Role: PM-mode
+
+The project owner is a **PM-mode solopreneur/founder**, not a solo dev. In this project:
+- They make PRD / brand / commercial decisions / variance rulings / ship approvals
+- They **do not read code** — do not enter backend/*.py or src/*.tsx level
+- Any STOP report must be **PM-readable** — no code line numbers, translated to "what was done / PM impact / Gate evidence"
+- Any dev phase that can be automated should be (CI + contract test + auth audit + brand verify + drift check)
+
+## Workflow: Factory Workflow
+
+This project runs **Factory Workflow**, orchestrated by skill `/factory-workflow`.
+
+### L1 PM-facing gates (user-driven, cannot be automated)
+- Gate 1 PRD → `/office-hours` → `docs/reviews/office-hours-prd-v{ver}.md`
+- Gate 1.5 Analytics → `docs/reviews/analytics-plan-v{ver}.md`
+- Gate Brand/UX → `docs/brand/BRAND_v{ver}.md`
+- Gate 2.5 Money Surface → `docs/reviews/money-surface-v{ver}.md`
+- Gate 3.5 Paywall Mental → `docs/reviews/paywall-mental-v{ver}.md`
+- Gate Ship (approval) → `docs/reviews/ship-v{ver}.md`
+- Gate T+7 → `docs/reviews/post-ship-t7-v{ver}.md`
+- Variance Gate → `docs/prd/PRD_v{ver}_AMENDMENTS.md`
+
+### L2 Dev-facing gates (fully automated, PM sees numbers only)
+- Gate 2 Schema drift → `docs/reviews/plan-eng-review-v{ver}.md`
+- Gate 2.1 Auth surface audit → `docs/reviews/auth-surface-v{ver}.md`
+- Gate 2.2 Contract test → `backend/tests/test_v{ver}_contract.py` + CI pass
+- Gate 2.3 Pricing single source → `shared/pricing.json` + CI drift
+- Gate 2.4 Brand verify → `scripts/verify-brand.ts` + CI
+- Gate 2.6 Phase open → `docs/dispatch/agent2b-v{ver}.{phase}.md` + §0 gstack check
+- Gate 3 Pixel smoke → `dev_scripts/{phase}_smoke_*.py` + `docs/reviews/qa-v{ver}-rc.md`
+
+### Core Hard Constraints
+Any gate closure requires a corresponding file artifact in `docs/reviews/`. ACK must include `Gate evidence: ls -la <path>`. No artifact = STATUS: BLOCKED.
+
+### STOP Report Format (Dev → PM) mandatory
+```
+BAD:  "Fixed bug in routes.py:47"
+GOOD:
+   What was done: <one sentence, no code>
+   PM impact: <retest UX? business risk? PRD change?>
+   Gate evidence: ls -la docs/reviews/<artifact>.md
+```
+
+## Required gstack Skills
+| Skill | When to invoke | L1/L2 |
+|---|---|---|
+| `/office-hours` | PRD / Money Surface / Paywall Mental / T+7 / variance | L1 |
+| `/plan-eng-review` | Schema phase start + any brief new/revised/stale >24h | L2 |
+| `/qa` | RC pre-ship / e2e smoke / any smoke test script step | L2 |
+| `/ship` | git tag / release notes / push / deploy (PM approval first) | L1+L2 |
+| `/investigate` | STOP with unknown root cause / quota exhausted / external dep issue | L2 |
+| `/retro` | Gate T+7 Post-Ship + lesson scan at each sub-phase | L1 |
+| `/factory-workflow` | Any phase / gate / variance / resume — top-level orchestrator | (orchestrator) |
+
+## Skill Routing
+When user request matches any of these keywords, immediately invoke the corresponding skill:
+- New project / resume / continue / Gate X / close gate / STOP report → `/factory-workflow`
+- PRD / strategy / commercial / pricing / cross-project → `/office-hours`
+- Schema / architecture review → `/plan-eng-review`
+- Smoke test / e2e / test → `/qa`
+- Tag / release / push / deploy → `/ship`
+- Error / quota exhausted / anomaly → `/investigate`
+- Retro / retrospective → `/retro`
+
+## Do NOT
+- Edit LOCKED PRD / BRAND / ARCHITECTURE in place
+- Mix doc / migration / refactor / feature in one commit
+- Skip gate evidence ls (no artifact = BLOCKED)
+- Decide L1 gates without PM approval
+- Assume "smooth = correct"
+- Push tags to remote without PM approval

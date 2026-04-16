@@ -1,0 +1,100 @@
+# Dispatch Brief — {{PROJECT}} v{{VER}}.{{PHASE}}
+
+**Status**: OPEN | IN_PROGRESS | ARCHIVED
+**Owner**: Agent 2B
+**Created**: {{DATE}}
+**Factory Workflow**: v1.0 (file-authoritative gate layer)
+
+---
+
+## §0 Pre-flight (mandatory)
+
+### Gate evidence ledger (append one line per gate closure)
+| Gate | Closed at | Artifact path | ls output |
+|---|---|---|---|
+|  |  |  |  |
+
+### gstack relevance check (must run before starting work)
+Scan 5 skills, list check/X + reason:
+
+- [ ] `/plan-eng-review` — Is this phase's brief new/revised/stale >24h? → **{{YES/NO + reason}}**
+- [ ] `/qa` — Does this phase include RC / pre-ship / e2e smoke? → **{{YES/NO + reason}}**
+- [ ] `/ship` — Does this phase include tag / release / deploy? → **{{YES/NO + reason}}**
+- [ ] `/investigate` — Any unresolved STOP with unknown root cause? → **{{YES/NO + reason}}**
+- [ ] `/office-hours` — Strategic / commercial / cross-project decisions involved? → **{{YES/NO + reason}}**
+
+Any checked → immediately invoke, let skill take over that step, record artifact in Gate evidence ledger.
+
+---
+
+## §1 Scope
+
+### Must ship
+- [ ] {{ITEM_1}}
+- [ ] {{ITEM_2}}
+
+### Non-goals (explicitly out of scope)
+- {{NON_GOAL_1}}
+- {{NON_GOAL_2}}
+
+### Boundaries (reference PRD section numbers)
+- PRD v{{VER}} §{{SECTION}}: {{QUOTE}}
+
+---
+
+## §2 Hard constraints
+
+| # | Constraint | Source |
+|---|---|---|
+| 1 | {{CONSTRAINT}} | PRD §X / BRAND §Y / Amendment #Z |
+
+---
+
+## §3 Commit plan
+
+| # | Commit message | Files | DoD |
+|---|---|---|---|
+| 1 |  |  |  |
+
+---
+
+## §4 DoD checklist
+
+**Global completion criteria** (including negative assertions):
+- [ ] {{POSITIVE_CHECK}}
+- [ ] `grep -r "{{OLD_THING}}" = 0 matches` (negative)
+- [ ] Gate evidence: {{ARTIFACT_PATHS}}
+
+---
+
+## §5 Escalation triggers
+
+Stop and ask PM (do NOT decide alone) when:
+- {{TRIGGER_1}}
+- {{TRIGGER_2}}
+- Any Variance (PRD/BRAND inconsistency)
+- Any L1 gate closure
+
+---
+
+## §6 Progress record (Dev appends as work progresses)
+
+| Step | Commit | Status | Notes |
+|---|---|---|---|
+
+---
+
+## §7 Pending variance requests
+
+Discovered during work. Mark RESOLVED with Amendment number when approved.
+
+| # | Issue | Status | Resolution |
+|---|---|---|---|
+
+---
+
+## §8 Next phase handoff notes
+
+Memo for whoever picks up the next phase:
+- {{NOTE_1}}
+- {{NOTE_2}}

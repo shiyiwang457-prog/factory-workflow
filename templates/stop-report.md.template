@@ -1,0 +1,46 @@
+# STOP Report (PM-readable) — Dev → PM
+
+<!-- Dev window fills this template for PM. NO code / file line numbers / technical jargon allowed. -->
+
+## What was done
+<!-- One sentence, business language only, no implementation details. -->
+<!-- BAD:  "Fixed routes.py:47 by adding @login_required"
+     GOOD: "Login check added to payment page — unauthenticated users are now blocked" -->
+
+
+## PM Impact
+
+- **Need to retest UX?** Yes / No
+  <!-- If yes, list which flows -->
+- **New business risk?** Yes / No
+  <!-- If yes, list risk + severity -->
+- **PRD change needed?** Yes / No
+  <!-- If yes, which section and proposed change -->
+- **Blocking next phase?** Yes / No
+
+## Gate evidence
+
+<!-- Paste ls -la output proving artifact exists -->
+```
+ls -la docs/reviews/{{ARTIFACT}}.md
+```
+
+Actual output:
+```
+{{LS_OUTPUT}}
+```
+
+## Pending variance (if any)
+<!-- PRD/BRAND deviations discovered during work. Do NOT decide how to handle — escalate to PM. -->
+
+- {{VARIANCE_1}}
+
+## Next step suggestion
+<!-- Dev's recommendation for what to do next. PM decides. -->
+
+- {{SUGGESTION}}
+
+---
+
+<!-- If this STOP report was rewritten from a dev-style original, add: -->
+<!-- > (note: original STOP report contained technical details, translated to PM-readable format) -->
