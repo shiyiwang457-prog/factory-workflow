@@ -1,4 +1,6 @@
 ---
+factory_mode: fast
+pm_reads_code: true
 concurrency_tier: T0_MVP
 tier_upgrade_trigger: "DAU > 100 sustained for 2 weeks"
 ---

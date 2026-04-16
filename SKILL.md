@@ -667,9 +667,14 @@ Step 6 MUST be clean. If not, preservation failed — do not proceed.
 
 ## STOP Report PM-Readable Rewriter
 
-If a Dev STOP report contains code / file line numbers / technical jargon, you MUST **rewrite** before showing to user.
+### When this applies
 
-### Rewrite Rules
+- **Full mode**: Always. PM is a non-technical stakeholder who reads no code.
+- **Fast mode**: Skip rewriting. The user IS the builder, they understand technical output. Sub-agent Dev reports are shown as-is. Only reformat if the user explicitly sets `pm_reads_code: false` in CLAUDE.md.
+
+### Rewrite Rules (full mode only)
+
+If a Dev STOP report contains code / file line numbers / technical jargon, you MUST **rewrite** before showing to user.
 
 | Not Allowed | Allowed |
 |---|---|
@@ -679,7 +684,7 @@ If a Dev STOP report contains code / file line numbers / technical jargon, you M
 | `Fixed bug in sqlalchemy relationship` | "Data model relationship fixed" |
 | `Migration 0042 applied` | "Database upgrade completed" |
 
-### 3-Paragraph Structure (mandatory)
+### 3-Paragraph Structure (mandatory in full mode)
 
 ```markdown
 **What was done**: <one sentence, no code>
@@ -743,7 +748,7 @@ PM_ACTION_REQUIRED: <what the user needs to do, or "none">
 ## Forbidden List (hard rules)
 
 1. No ACK without `ls -la` output
-2. No STOP reports with code / line numbers / technical jargon shown to PM (must rewrite)
+2. No STOP reports with code / line numbers / technical jargon shown to PM (must rewrite) — **full mode only**; fast mode shows Dev output as-is unless `pm_reads_code: false`
 3. No mixing feature + doc + migration + refactor in one commit
 4. No in-place edits of LOCKED documents (PRD / BRAND / ARCHITECTURE)
 5. No skipping L1 gates (PRD / Analytics / Money Surface / Paywall Mental / Ship / T+7)
