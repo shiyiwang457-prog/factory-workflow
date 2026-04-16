@@ -283,13 +283,45 @@ Route to one of 6 modes based on preamble output:
 
 **Actions**:
 
-1. Check if previous phase's Gate 2.5/2.6 is closed (if not → bounce to GATE_TRANSITION)
-2. Write `docs/dispatch/agent2b-v{ver}.{phase}.md` (from `templates/dispatch-brief.md.template`)
-   - §0 **Gate evidence ledger** (required by v1.0)
-   - §0 **gstack relevance check**: scan 5 skills, list check/X + reason
-   - §1-§8: Scope / Hard constraints / Commit plan / DoD / Escalation / Progress / Variance / Handoff
+1. Check if previous phase's Gate 2.6 is closed (if not → bounce to GATE_TRANSITION)
+   - In full mode, also check Gate 2.5 (Money Surface)
+2. Write `docs/dispatch/agent2b-v{ver}.{phase}.md`
 3. Commit brief: `docs(dispatch): <ver>.<phase> <scope>`
-4. Switch back to RESUME mode and wait for Dev window to pick up
+4. In fast mode: proceed to dev execution immediately (sub-agent or same window)
+   In full mode: switch back to RESUME mode and wait for Dev window to pick up
+
+### Fast Mode Brief (4 sections)
+
+```markdown
+# Brief — {PROJECT} v{VER}.{PHASE}
+
+## §1 Scope + Non-goals
+### Must ship
+- [reference PRD FR-xxx]
+
+### Non-goals
+- [explicitly out of scope]
+
+## §2 Commit Plan
+| # | Commit message | Files | DoD |
+|---|---|---|---|
+| 1 |  |  |  |
+
+## §3 Progress
+| Step | Commit | Status | Notes |
+|---|---|---|---|
+
+## §4 Variance (if any)
+| # | Issue | Status | Resolution |
+|---|---|---|---|
+```
+
+Fast brief is ~30 lines. Scope and non-goals are merged. No §0 gstack check (fast mode trusts the builder). No §2 Hard constraints (PRD is the source). No §5 Escalation (builder knows when to stop). No §8 Handoff (single window, no handoff needed).
+
+### Full Mode Brief (8 sections)
+
+Use `templates/dispatch-brief.md.template` with all 8 sections:
+§0 Gate evidence ledger + gstack relevance check, §1 Scope, §2 Hard constraints, §3 Commit plan, §4 DoD, §5 Escalation triggers, §6 Progress, §7 Variance, §8 Handoff notes.
 
 ---
 
