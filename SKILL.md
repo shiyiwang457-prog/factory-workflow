@@ -434,37 +434,66 @@ Missing any of these 3 lines → Gate 2 blocked.
 
 ## Agent Topology (4 agents + boundaries)
 
-This skill orchestrates 4 agents. Each is an independent Claude session — they do NOT share chat context, communicating ONLY through files.
+### Fast Mode: Single Window + Sub-agents
 
-### Agent 1 — PM Orchestrator (main window, this skill)
+In fast mode, everything runs in **one Claude session**. The main thread is the orchestrator (PM + coordination). Dev and QA work is delegated to sub-agents via the `Agent` tool.
+
+```
+Main thread (PM/Orchestrator)
+  ├── Schema check: sub-agent (read-only drift scan)
+  ├── Dev execution: sub-agent per commit (write code + commit)
+  ├── QA smoke: sub-agent (read-only test run)
+  └── Ship: main thread (tag + changelog + deploy)
+```
+
+**Fast mode sub-agent rules**:
+1. Main thread writes the brief, then spawns Dev sub-agent with brief content in the prompt
+2. Dev sub-agent can write code + git commit, but CANNOT edit LOCKED docs or decide variances
+3. If sub-agent hits a variance → it STOPS and returns the issue to main thread
+4. QA sub-agent is read-only: run tests, take screenshots, report pass/fail
+5. Main thread collects sub-agent output and makes all gate decisions
+
+**Sub-agent spawn template** (Dev execution):
+```
+Agent({
+  description: "Dev: v{ver}.{phase} commit {N}",
+  prompt: "Execute this commit from the dispatch brief:\n\n{commit row from §2}\n\nConstraints:\n- Read PRD at docs/prd/PRD_v*.md for requirements\n- Read brief at docs/dispatch/agent2b-v{ver}.{phase}.md for full context\n- 1 commit only, message format: '{type}({scope}): {description}'\n- If you discover a PRD/BRAND inconsistency, STOP and report it — do NOT work around it\n- Non-goals: {non-goals from §1}\n\nReport: what was done, files changed, any concerns. < 200 words."
+})
+```
+
+### Full Mode: 4 Separate Windows
+
+In full mode, 4 agents run as independent Claude sessions. They do NOT share chat context, communicating ONLY through files.
+
+#### Agent 1 — PM Orchestrator (main window, this skill)
 - **Role**: L1 gate decisions, mode routing, audit triggers, STOP report reformatting
 - **Can read**: All `docs/` + `git log` + CLAUDE.md + project memory
 - **Can write**: `docs/reviews/<L1-gate>-v*.md`, `docs/prd/PRD_v*_AMENDMENTS.md`, `docs/retro/`, `CLAUDE.md`
 - **Can invoke**: `/office-hours`, `/retro`, `/ship` (L1 approval only)
 - **Forbidden**: Editing `backend/*.py` / `src/*.tsx` / migrations / feature code; deciding L1 gates without PM
 
-### Agent 2A — Schema/Plan Architect (separate window)
+#### Agent 2A — Schema/Plan Architect (separate window)
 - **Role**: Gate 2 (schema drift), Gate 2.6 (phase open), writes dispatch briefs
 - **Can read**: PRD, BRAND, existing OpenAPI, alembic history, prior briefs
 - **Can write**: `docs/openapi_v*.yaml`, `backend/alembic/versions/*.py`, `docs/dispatch/agent2b-*.md`, `docs/reviews/plan-eng-review-*.md`
 - **Can invoke**: `/plan-eng-review`
 - **Forbidden**: Writing feature code; editing LOCKED PRD; deciding variances
 
-### Agent 2B — Dev Executor (separate window)
+#### Agent 2B — Dev Executor (separate window)
 - **Role**: Execute dispatch brief §3 Commit plan row by row
 - **Can read**: Dispatch brief, PRD, BRAND, source code
 - **Can write**: `backend/`, `src/`, `scripts/`, `tests/`, `dev_scripts/`, feature commits
 - **Can invoke**: `/investigate` (on STOP), `/qa` (in-phase smoke), `/review` (self-review)
 - **Forbidden**: Editing LOCKED docs; deciding variances on their own; mixing commit scopes
 
-### Agent 3 — QA/Ship (may share window with 2B or separate)
+#### Agent 3 — QA/Ship (may share window with 2B or separate)
 - **Role**: Gate 3 Pixel smoke, Gate Ship L2 execution
 - **Can read**: Brief §4 DoD, all L2 gate artifacts, CHANGELOG
 - **Can write**: `dev_scripts/*smoke*.py`, `docs/reviews/qa-*-rc.md`, `CHANGELOG.md`, `git tag`
 - **Can invoke**: `/qa`, `/ship`, `/design-review`, `/canary`
 - **Forbidden**: Pushing tags without PM L1 approval; skipping RC preview
 
-### Agent Permission Matrix
+### Agent Permission Matrix (full mode)
 
 | Path / Resource | Agent 1 PM | Agent 2A Plan | Agent 2B Dev | Agent 3 QA |
 |---|:---:|:---:|:---:|:---:|
@@ -481,45 +510,61 @@ This skill orchestrates 4 agents. Each is an independent Claude session — they
 | `dev_scripts/*smoke*.py` | no | no | read | **read/write** |
 | `git tag` | approve | no | no | execute (after approval) |
 
-**Memory write permission**: Only Agent 1 writes to project memory. Agents 2A/2B/3 report lessons in STOP reports, Agent 1 decides what to persist.
+**Memory write permission**: Only Agent 1 (or main thread in fast mode) writes to project memory.
 
 ---
 
 ## Handoff Contracts (inter-agent file handshake protocol)
 
+### Fast Mode Handoffs
+
+In fast mode, there are no separate windows. Handoffs become in-process delegation:
+
+| Step | What happens | Artifact |
+|---|---|---|
+| Brief → Dev | Main thread writes brief, spawns Dev sub-agent with brief path in prompt | `docs/dispatch/agent2b-v{ver}.{phase}.md` |
+| Dev → Main | Sub-agent returns completion report (< 200 words) | git commit + sub-agent output |
+| Dev → QA | Main thread spawns QA sub-agent after all Dev commits done | Sub-agent reads code + runs tests |
+| QA → Ship | QA sub-agent returns pass/fail report, main thread decides | `docs/reviews/qa-v{ver}-rc.md` |
+| Variance | Sub-agent STOPS and returns issue text, main thread handles | STOP in sub-agent output |
+
+**Key difference from full mode**: No pickup signals needed. No STOP report reformatting needed (PM is the main thread). No handoff memo files. The brief file is still written and committed (file-authoritative principle), but the handoff is immediate.
+
+### Full Mode Handoffs (4 separate windows)
+
 4 agents share NO chat context — they communicate ONLY through files. Every handoff requires a file artifact.
 
-### Contract A: Agent 1 → Agent 2A (open phase)
+#### Contract A: Agent 1 → Agent 2A (open phase)
 - **Trigger**: Agent 1 decides to open a new sub-phase (Mode PHASE_OPEN)
 - **Input**: Agent 1 writes `docs/dispatch/agent2b-v{ver}.{phase}.md` §1 Scope + §2 Hard constraints + §5 Escalation triggers (empty §3 for 2A to fill)
 - **Channel**: File + git commit (`docs(dispatch): v{ver}.{phase} scope draft`)
 - **Agent 2A pickup signal**: Latest dispatch brief has empty §3
 
-### Contract B: Agent 2A → Agent 2B (issue brief)
+#### Contract B: Agent 2A → Agent 2B (issue brief)
 - **Trigger**: Agent 2A completes §3 Commit plan + §4 DoD + §0 gstack check
 - **Input**: Complete dispatch brief (all 8 sections filled)
 - **Channel**: git commit (`docs(dispatch): v{ver}.{phase} ready for exec`)
 - **Agent 2B pickup signal**: `git log --oneline -5` shows "ready for exec" + brief §3 non-empty
 
-### Contract C: Agent 2B → Agent 1 (STOP feedback)
+#### Contract C: Agent 2B → Agent 1 (STOP feedback)
 - **Trigger**: Agent 2B completes a commit / hits variance / finishes phase
 - **Input**: STOP report, strictly formatted per `templates/stop-report.md.template`
 - **Channel**: Agent 2B cannot write memory directly; STOP report goes to Agent 1, who reformats for PM
 - **Agent 1 duty**: Any STOP containing code / line numbers / technical terms MUST be reformatted into 3-paragraph PM-readable structure before showing to PM
 
-### Contract D: Agent 2B → Agent 3 (RC handoff)
+#### Contract D: Agent 2B → Agent 3 (RC handoff)
 - **Trigger**: Agent 2B completes all §3 commits, Gates 2.1-2.4 all green
 - **Input**: Brief §6 all done, all L2 gate artifacts exist
 - **Channel**: git commit + `docs/reviews/agent2b-handoff-v{ver}.{phase}.md` handoff memo
 - **Agent 3 pickup signal**: Handoff memo exists + all L2 artifact `ls` succeeds
 
-### Contract E: Agent 3 → Agent 1 (ship approval request)
+#### Contract E: Agent 3 → Agent 1 (ship approval request)
 - **Trigger**: Agent 3 completes Gate 3 Pixel smoke + RC artifact
 - **Input**: `docs/reviews/qa-v{ver}-rc.md` + visual evidence
 - **Channel**: AskUserQuestion (Agent 1 prompts PM), options: A) approve ship / B) bounce back / C) E-VAR
 - **Agent 1 duty**: MUST AskUserQuestion, cannot approve Gate Ship on PM's behalf
 
-### Contract F: Any Agent → Agent 1 (variance escalation)
+#### Contract F: Any Agent → Agent 1 (variance escalation)
 - **Trigger**: Agent 2A/2B/3 discovers PRD/BRAND inconsistency / external dep down / root cause unknown
 - **Input**: STOP report + explicit `VARIANCE: <type>` tag
 - **Channel**: Immediately stop work, return to Agent 1 for Mode 5 VARIANCE
